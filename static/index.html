@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rust WebSocket Chat</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      background-color: #c5b1c2; /* Set background color for the page */
+    }
+    #chat {
+      border: 1px solid #ccc;
+      padding: 1rem;
+      height: 300px;
+      overflow-y: auto;
+      background-color: #d3d3d3; /* Set background color for chat area */
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-radius: 10px; /* Rounded corners */
+    }
+
+    .user-message {
+      background-color: #d1f7c4;
+      align-self: flex-end; /* Align user message to the right */
+      padding: 0.5rem;
+      border-radius: 10px;
+    }
+
+    .other-message {
+      background-color: #f1f1f1;
+      align-self: flex-start; /* Align other messages to the left */
+      padding: 0.5rem;
+      border-radius: 10px;
+    }
+
+    #message {
+      width: 80%;
+      padding: 0.5rem;
+    }
+
+    #send {
+      padding: 0.5rem;
+    }
+
+    #nickname {
+      padding: 0.5rem;
+      width: 80%;
+      margin-bottom: 1rem;
+    }
+
+  </style>
+</head>
+<body>
+  <h2>Rust WebSocket Chat</h2>
+  <div id="chat"></div>
+
+  <input type="text" id="nickname" placeholder="Enter your nickname" />
+
+  <input type="text" id="message" placeholder="Type a message..." />
+  <button id="send">Send</button>
+
+  <script>
+    let nickname = "";
+    const socket = new WebSocket("ws://localhost:3030/chat");
+    const chat = document.getElementById("chat");
+    const messageInput = document.getElementById("message");
+    const sendBtn = document.getElementById("send");
+    const nicknameInput = document.getElementById("nickname");
+
+     // Prompt the user for a nickname
+     nicknameInput.addEventListener("change", () => {
+      nickname = nicknameInput.value.trim();
+      if (nickname) {
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+        nicknameInput.disabled = true;
+        appendMessage(`Welcome, ${nickname}!`, true);
+        connectWebSocket();
+      }
+    });
+
+
+    socket.onopen = () => {
+      appendMessage("✅ Connected to server", true); // Mark this message as from the user
+    };
+
+    socket.onmessage = (event) => {
+      appendMessage(event.data, false); // Messages from others are false
+    };
+
+    sendBtn.onclick = () => {
+      const msg = messageInput.value;
+      if (msg) {
+        socket.send(`${nickname}: ${msg}`);
+        appendMessage(`You: ${msg}`, true); // Mark this message as from the user
+        messageInput.value = "";
+      }
+    };
+
+    function appendMessage(msg, isUserMessage) {
+      const el = document.createElement("div");
+      el.classList.add("message");
+
+      // Assign different styles for user and other messages
+      if (isUserMessage) {
+        el.classList.add("user-message");
+      } else {
+        el.classList.add("other-message");
+      }
+
+      el.textContent = msg;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>
