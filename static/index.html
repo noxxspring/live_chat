@@ -1,66 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Rust WebSocket Chat</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      max-width: 600px;
-      margin: 2rem auto;
-      background-color: #c5b1c2; /* Set background color for the page */
-    }
-    #chat {
-      border: 1px solid #ccc;
-      padding: 1rem;
-      height: 300px;
-      overflow-y: auto;
-      background-color: #d3d3d3; /* Set background color for chat area */
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      border-radius: 10px; /* Rounded corners */
-    }
-
-    .user-message {
-      background-color: #d1f7c4;
-      align-self: flex-end; /* Align user message to the right */
-      padding: 0.5rem;
-      border-radius: 10px;
-    }
-
-    .other-message {
-      background-color: #f1f1f1;
-      align-self: flex-start; /* Align other messages to the left */
-      padding: 0.5rem;
-      border-radius: 10px;
-    }
-
-    #message {
-      width: 80%;
-      padding: 0.5rem;
-    }
-
-    #send {
-      padding: 0.5rem;
-    }
-
-    #nickname {
-      padding: 0.5rem;
-      width: 80%;
-      margin-bottom: 1rem;
-    }
-
-  </style>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Rust WebSocket Chat</title>
+        <style>
+          * {
+            box-sizing: border-box;
+          }
+      
+          body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 1rem;
+            background-color: #c5b1c2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+          }
+      
+          h2 {
+            margin-top: 0;
+            text-align: center;
+          }
+      
+          #chat {
+            width: 100%;
+            max-width: 600px;
+            height: 50vh;
+            border: 1px solid #ccc;
+            padding: 1rem;
+            overflow-y: auto;
+            background-color: #d3d3d3;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-radius: 10px;
+          }
+      
+          .user-message {
+            background-color: #d1f7c4;
+            align-self: flex-end;
+            padding: 0.5rem;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+          }
+      
+          .other-message {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+            padding: 0.5rem;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+          }
+      
+          .input-group {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 600px;
+            gap: 0.5rem;
+            margin-top: 1rem;
+          }
+      
+          input[type="text"] {
+            padding: 0.75rem;
+            font-size: 1rem;
+            border-radius: 5px;
+            border: 1px solid #999;
+          }
+      
+          #send {
+            padding: 0.75rem;
+            font-size: 1rem;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+          }
+      
+          #send:hover {
+            background-color: #45a049;
+          }
+        </style>
 </head>
 <body>
   <h2>Rust WebSocket Chat</h2>
   <div id="chat"></div>
 
-  <input type="text" id="nickname" placeholder="Enter your nickname" />
-
-  <input type="text" id="message" placeholder="Type a message..." />
-  <button id="send">Send</button>
+  <div class="input-group">
+    <input type="text" id="nickname" placeholder="Enter your nickname" />
+    <input type="text" id="message" placeholder="Type a message..." />
+    <button id="send">Send</button>
+  </div>
+  
 
   <script>
     let nickname = "";
@@ -84,7 +122,7 @@
 
 
     socket.onopen = () => {
-      appendMessage("✅ Connected to server", true); // Mark this message as from the user
+      appendSystemMessage("✅ Connected to server", true); // Mark this message as from the user
     };
 
     socket.onmessage = (event) => {
@@ -114,6 +152,15 @@
       el.textContent = msg;
       chat.appendChild(el);
       chat.scrollTop = chat.scrollHeight;
+    }
+
+    function appendSystemMessage(msg) {
+      const el = document.createElement("div");
+      el.style.textAlign = "center";
+      el.style.color = "green";
+      el.style.fontSize = "1.0rem";
+      el.textContent = msg;
+      chat.appendChild(el);
     }
   </script>
 </body>
