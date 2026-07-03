@@ -25,10 +25,83 @@
             margin-top: 0;
             text-align: center;
           }
+
+          /* Auth Container */
+          #auth-container {
+            width: 100%;
+            max-width: 400px;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+          }
+
+          #auth-container h3 {
+            margin-top: 0;
+            text-align: center;
+          }
+
+          .auth-input {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            border-radius: 5px;
+            border: 1px solid #999;
+          }
+
+          .auth-btn {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+          }
+
+          .auth-btn:hover {
+            background-color: #45a049;
+          }
+
+          .auth-btn.secondary {
+            background-color: #2196F3;
+          }
+
+          .auth-btn.secondary:hover {
+            background-color: #1976D2;
+          }
+
+          .auth-error {
+            color: red;
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+          }
+
+          .auth-toggle {
+            text-align: center;
+            margin-top: 1rem;
+            cursor: pointer;
+            color: #2196F3;
+          }
+
+          .auth-toggle:hover {
+            text-decoration: underline;
+          }
+
+          /* Hide chat until authenticated */
+          #chat-container {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+          }
       
           #chat {
             width: 100%;
-            max-width: 600px;
             height: 50vh;
             border: 1px solid #ccc;
             padding: 1rem;
@@ -62,12 +135,11 @@
             display: flex;
             flex-direction: column;
             width: 100%;
-            max-width: 600px;
             gap: 0.5rem;
             margin-top: 1rem;
           }
       
-          input[type="text"] {
+          input[type="text"], input[type="email"], input[type="password"] {
             padding: 0.75rem;
             font-size: 1rem;
             border-radius: 5px;
@@ -87,68 +159,269 @@
           #send:hover {
             background-color: #45a049;
           }
+
+          .logout-btn {
+            padding: 0.5rem 1rem;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+          }
+
+          .logout-btn:hover {
+            background-color: #d32f2f;
+          }
+
+          .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+          }
         </style>
 </head>
 <body>
   <h2>Rust WebSocket Chat</h2>
-  <div id="chat"></div>
 
-  <div class="input-group">
-    <input type="text" id="nickname" placeholder="Enter your nickname" />
-    <input type="text" id="message" placeholder="Type a message..." />
-    <button id="send">Send</button>
-  </div>
+  <!-- Authentication Container -->
+ <div id="auth-container">
+  <h3 id="auth-title">Login</h3>
+  <div id="auth-error" class="auth-error"></div>
   
+  <input type="email" id="auth-email" class="auth-input" placeholder="Email" />
+  <input type="password" id="auth-email-password" class="auth-input" placeholder="Email Password" />
+  <input type="password" id="auth-user-password" class="auth-input" placeholder="User Password" />
+  
+  <button id="auth-submit" class="auth-btn">Login</button>
+  <button id="auth-toggle" class="auth-btn secondary">Don't have an account? Sign Up</button>
+</div>
+
+  <!-- Chat Container -->
+  <div id="chat-container">
+    <div class="user-info">
+      <span id="current-user">Logged in as: <strong></strong></span>
+      <button class="logout-btn" id="logout-btn">Logout</button>
+    </div>
+    <div id="chat"></div>
+
+    <div class="input-group">
+      <input type="text" id="message" placeholder="Type a message..." />
+      <button id="send">Send</button>
+    </div>
+  </div>
 
   <script>
-    let nickname = "";
-    const socket = new WebSocket(`wss://${window.location.host}/chat`);
+    // State
+    let currentUser = null;
+    let isLoginMode = true;
+    let socket = null;
     const chat = document.getElementById("chat");
     const messageInput = document.getElementById("message");
     const sendBtn = document.getElementById("send");
-    const nicknameInput = document.getElementById("nickname");
 
-     // Prompt the user for a nickname
-     nicknameInput.addEventListener("change", () => {
-      nickname = nicknameInput.value.trim();
-      if (nickname) {
-        messageInput.disabled = false;
-        sendBtn.disabled = false;
-        nicknameInput.disabled = true;
-        appendMessage(`Welcome, ${nickname}!`, true);
-        connectWebSocket();
+    // Auth elements
+    const authContainer = document.getElementById("auth-container");
+    const chatContainer = document.getElementById("chat-container");
+   const authEmail = document.getElementById("auth-email");
+const authEmailPassword = document.getElementById("auth-email-password");
+const authUserPassword = document.getElementById("auth-user-password");
+const authSubmit = document.getElementById("auth-submit");
+const authToggle = document.getElementById("auth-toggle");
+const authTitle = document.getElementById("auth-title");
+const authError = document.getElementById("auth-error");
+    const currentUserSpan = document.getElementById("current-user");
+    const logoutBtn = document.getElementById("logout-btn");
+
+    // Toggle between Login and Sign Up
+    authToggle.addEventListener("click", () => {
+      isLoginMode = !isLoginMode;
+      authTitle.textContent = isLoginMode ? "Login" : "Sign Up";
+      authSubmit.textContent = isLoginMode ? "Login" : "Sign Up";
+      authToggle.textContent = isLoginMode ? "Don't have an account? Sign Up" : "Already have an account? Login";
+      authError.textContent = "";
+    });
+
+    // Handle authentication
+    authSubmit.addEventListener("click", async () => {
+  const email = authEmail.value.trim();
+  const emailPassword = authEmailPassword.value.trim();
+  const userPassword = authUserPassword.value.trim();
+
+  // Validate both passwords are filled
+  if (!email || !emailPassword || !userPassword) {
+    authError.textContent = "Please fill in all fields (Email, Email Password, and User Password)";
+    return;
+  }
+
+  authError.textContent = "";
+
+  try {
+    const endpoint = isLoginMode ? "/login" : "/signup";
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        email: email, 
+        email_password: emailPassword,
+        user_password: userPassword 
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Authentication successful
+      currentUser = email;
+      authContainer.style.display = "none";
+      chatContainer.style.display = "block";
+      currentUserSpan.innerHTML = `Logged in as: <strong>${email}</strong>`;
+      
+      // Initialize WebSocket connection
+      connectWebSocket();
+      
+      // Enable chat
+      messageInput.disabled = false;
+      sendBtn.disabled = false;
+      
+      appendSystemMessage(`✅ Welcome, ${email}!`);
+    } else {
+      authError.textContent = data.error || "Authentication failed";
+    }
+  } catch (error) {
+    authError.textContent = "Error connecting to server";
+    console.error("Auth error:", error);
+  }
+});
+
+// Logout
+logoutBtn.addEventListener("click", async () => {
+  try {
+    await fetch("/logout", { method: "POST" });
+  } catch (e) {
+    console.error("Logout error:", e);
+  }
+  
+  // Close WebSocket
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+  
+  // Reset UI
+  currentUser = null;
+  authContainer.style.display = "block";
+  chatContainer.style.display = "none";
+  chat.innerHTML = "";
+  authEmail.value = "";
+  authEmailPassword.value = "";
+  authUserPassword.value = "";
+  messageInput.disabled = true;
+  sendBtn.disabled = true;
+  
+  // Reset to login mode
+  isLoginMode = true;
+  authTitle.textContent = "Login";
+  authSubmit.textContent = "Login";
+  authToggle.textContent = "Don't have an account? Sign Up";
+  authError.textContent = "";
+});
+
+// Enter key to submit auth (from any field)
+authEmailPassword.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    authSubmit.click();
+  }
+});
+
+authUserPassword.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    authSubmit.click();
+  }
+});
+
+    // WebSocket connection
+    function connectWebSocket() {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        return;
+      }
+
+      socket = new WebSocket(`wss://${window.location.host}/chat`);
+
+      socket.onopen = () => {
+        appendSystemMessage("✅ Connected to chat server");
+        // Send user info to server
+        if (currentUser) {
+          socket.send(JSON.stringify({ type: "auth", email: currentUser }));
+        }
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "message") {
+            appendMessage(data.sender + ": " + data.text, false);
+          } else if (data.type === "system") {
+            appendSystemMessage(data.text);
+          }
+        } catch (e) {
+          // Fallback for plain text messages
+          appendMessage(event.data, false);
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        appendSystemMessage("❌ WebSocket error occurred");
+      };
+
+      socket.onclose = () => {
+        appendSystemMessage("⚠️ Disconnected from server");
+      };
+    }
+
+    // Send message
+    sendBtn.onclick = () => {
+      const msg = messageInput.value.trim();
+      if (msg && socket && socket.readyState === WebSocket.OPEN) {
+        const messageData = {
+          type: "message",
+          sender: currentUser,
+          text: msg
+        };
+        socket.send(JSON.stringify(messageData));
+        appendMessage(`You: ${msg}`, true);
+        messageInput.value = "";
+      } else if (!socket || socket.readyState !== WebSocket.OPEN) {
+        appendSystemMessage("❌ Not connected to server");
+      }
+    };
+
+    // Enter key to send message
+    messageInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        sendBtn.click();
       }
     });
 
-
-    socket.onopen = () => {
-      appendSystemMessage("✅ Connected to server", true); // Mark this message as from the user
-    };
-
-    socket.onmessage = (event) => {
-      appendMessage(event.data, false); // Messages from others are false
-    };
-
-    sendBtn.onclick = () => {
-      const msg = messageInput.value;
-      if (msg) {
-        socket.send(`${nickname}: ${msg}`);
-        appendMessage(`You: ${msg}`, true); // Mark this message as from the user
-        messageInput.value = "";
+    // Enter key to submit auth
+    authPassword.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        authSubmit.click();
       }
-    };
+    });
 
+    // Helper functions
     function appendMessage(msg, isUserMessage) {
       const el = document.createElement("div");
-      el.classList.add("message");
-
-      // Assign different styles for user and other messages
       if (isUserMessage) {
         el.classList.add("user-message");
       } else {
         el.classList.add("other-message");
       }
-
       el.textContent = msg;
       chat.appendChild(el);
       chat.scrollTop = chat.scrollHeight;
@@ -161,7 +434,12 @@
       el.style.fontSize = "1.0rem";
       el.textContent = msg;
       chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
     }
+
+    // Initially disable chat
+    messageInput.disabled = true;
+    sendBtn.disabled = true;
   </script>
 </body>
 </html>
