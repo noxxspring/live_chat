@@ -2,12 +2,11 @@ services:
   # Your Rust chat application
   live_chat:
     build: .
+    image: live_chat:latest
     container_name: live_chat_app
     restart: unless-stopped
-    # These ports are for internal communication only, not exposed to the host.
-    # They will be accessed by the Nginx container.
-    ports:
-      - "127.0.0.1:3030:3030"
+    expose:
+      - "3030"
     networks:
       - app_network  
 
@@ -22,7 +21,10 @@ services:
       - "80:80" # Expose HTTP port 80 to the public
     depends_on:
       - live_chat
+    networks:
+      - app_network
 
-  networks:
+# TOP-LEVEL networks block
+networks:
   app_network:
-    driver: bridge    
+    driver: bridge
