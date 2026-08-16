@@ -1,4 +1,4 @@
-name: Deploy to DigitalOcean
+name: Build and Deploy Docker Image
 
 on:
   push:
@@ -10,22 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Checkout your source code
       - name: Checkout code
         uses: actions/checkout@v3
       
-      # Install Rust (for building)
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       
-      # Build the binary (server will NEVER do this)
-      - name: Build release binary
-        run: cargo build --release --locked
+      - name: Build Docker image
+        run: |
+          docker build -t live_chat:${{ github.sha }} .
+          docker tag live_chat:${{ github.sha }} live_chat:latest
       
-      # Setup SSH key for deployment
+      - name: Save image
+        run: docker save live_chat:latest -o live_chat.tar
+      
       - name: Setup SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -36,38 +34,25 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
       
-      # Stop the service (so binary can be overwritten)
-      - name: Stop service
+      - name: Deploy to Droplet
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "sudo systemctl stop live_chat || true"
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "docker stop chat-app || true && docker rm chat-app || true"
+          scp -i ~/.ssh/id_ed25519 live_chat.tar root@$DROPLET_IP:/root/
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
+            docker load -i /root/live_chat.tar
+            docker run -d \
+              -p 3030:3030 \
+              --name chat-app \
+              --restart unless-stopped \
+              live_chat:latest
+            rm -f /root/live_chat.tar
+          EOF
       
-      # Copy the binary (built by GitHub, not server!)
-      - name: Deploy binary
-        env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
-        run: |
-          scp -i ~/.ssh/id_ed25519 ./target/release/live_chat root@$DROPLET_IP:/opt/live_chat/
-      
-      # Copy static files
-      - name: Deploy static files
-        env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
-        run: |
-          scp -i ~/.ssh/id_ed25519 -r ./static root@$DROPLET_IP:/opt/live_chat/
-      
-      # Start the service
-      - name: Start service
-        env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
-        run: |
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "sudo systemctl start live_chat"
-      
-      # Verify it's running
       - name: Verify deployment
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "sudo systemctl status live_chat --no-pager"
-          curl -f http://$DROPLET_IP:3030 || echo " App might need a moment to start"
+          sleep 5
+          curl -f http://$DROPLET_IP:3030 || exit 1

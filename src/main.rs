@@ -67,12 +67,21 @@ async fn main() {
             ws.on_upgrade(move |socket| handle_socket(socket, clients))
         });
 
+    let health = warp::path("health")
+    .map(|| {
+        warp::reply::json(&serde_json::json!({
+            "status": "ok",
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        }))
+    });    
+
     // Combine routes
     let routes = index_html
         .or(chat)
         .or(signup)
         .or(login)
-        .or(logout);
+        .or(logout)
+        .or(health);
 
     println!("WebSocket server running on ws://localhost:3030/chat");
     println!("Signup endpoint: http://localhost:3030/signup");

@@ -1,224 +1,284 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Rust WebSocket Chat</title>
-        <style>
-          * {
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Rust WebSocket Chat</title>
+    <style>
+        * {
             box-sizing: border-box;
-          }
-      
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-    font-family: sans-serif;
-    margin: 0;
-    padding: 1rem;
-    background-color: #1a1a2e;  /* Changed from #c5b1c2 to dark navy */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100vh;
-    width: 100vw;
-}
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+            padding: 1rem;
+        }
 
-h2 {
-    margin-top: 0;
-    text-align: center;
-    color: #ffffff;  /* Added white text */
-}
+        h2 {
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
 
-/* Auth Container */
-#auth-container {
-    width: 100%;
-    max-width: 400px;
-    background-color: #16213e;  /* Changed from white to dark blue */
-    padding: 2rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    margin-top: 2rem;
-}
+        /* Container wrappers */
+        #auth-container, #chat-container {
+            width: 100%;
+            max-width: 520px;
+            background-color: #16213e;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border: 1px solid #0f3460;
+        }
 
-#auth-container h3 {
-    margin-top: 0;
-    text-align: center;
-    color: #e0e0e0;  /* Added light text */
-}
+        #auth-container h3 {
+            margin-bottom: 1.25rem;
+            text-align: center;
+            color: #ffffff;
+            font-size: 1.2rem;
+        }
 
-.auth-input {
-    width: 100%;
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    font-size: 1rem;
-    border-radius: 5px;
-    border: 1px solid #555;  /* Darker border */
-    background-color: #0f3460;  /* Added dark input background */
-    color: #ffffff;  /* White text in inputs */
-}
+        .auth-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.85rem;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            border: 1px solid #0f3460;
+            background-color: #0f3460;
+            color: #ffffff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
 
-.auth-input::placeholder {
-    color: #aaa;  /* Lighter placeholder text */
-}
+        .auth-input:focus {
+            border-color: #e94560;
+        }
 
-.auth-btn {
-    width: 100%;
-    padding: 0.75rem;
-    font-size: 1rem;
-    background-color: #e94560;  /* Changed from #4caf50 to vibrant red/pink */
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-bottom: 0.5rem;
-}
+        .auth-input::placeholder {
+            color: #8a99ad;
+        }
 
-.auth-btn:hover {
-    background-color: #c73e54;  /* Darker hover */
-}
+        .auth-btn {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background-color: #e94560;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 0.25rem;
+            margin-bottom: 0.5rem;
+            transition: background-color 0.2s;
+        }
 
-.auth-btn.secondary {
-    background-color: #533483;  /* Changed from #2196F3 to purple */
-}
+        .auth-btn:hover {
+            background-color: #c73e54;
+        }
 
-.auth-btn.secondary:hover {
-    background-color: #3d2566;  /* Darker purple */
-}
+        .auth-btn.secondary {
+            background-color: transparent;
+            color: #8a99ad;
+            font-weight: normal;
+            font-size: 0.85rem;
+        }
 
-.auth-error {
-    color: #ff6b6b;  /* Brighter red */
-    text-align: center;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-}
+        .auth-btn.secondary:hover {
+            color: #ffffff;
+            background-color: transparent;
+        }
 
-.auth-toggle {
-    text-align: center;
-    margin-top: 1rem;
-    cursor: pointer;
-    color: #e94560;  /* Changed to match primary color */
-}
+        .auth-error {
+            color: #ff6b6b;
+            text-align: center;
+            margin-bottom: 0.85rem;
+            font-size: 0.85rem;
+            min-height: 1rem;
+        }
 
-.auth-toggle:hover {
-    text-decoration: underline;
-}
+        /* Chat layout */
+        #chat-container {
+            display: none;
+            flex-direction: column;
+            height: 80vh;
+            max-height: 650px;
+        }
 
-/* Hide chat until authenticated */
-#chat-container {
-    display: none;
-    width: 100%;
-    max-width: 600px;
-}
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #0f3460;
+        }
 
-#chat {
-    width: 100%;
-    height: 50vh;
-    border: 1px solid #444;
-    padding: 1rem;
-    overflow-y: auto;
-    background-color: #1a1a2e;  /* Changed to match body */
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border-radius: 10px;
-}
+        .user-info span {
+            color: #b8c7d9;
+            font-size: 0.9rem;
+        }
 
-.user-message {
-    background-color: #e94560;  /* Changed from #d1f7c4 to vibrant red/pink */
-    color: #ffffff;  /* White text */
-    align-self: flex-end;
-    padding: 0.5rem 1rem;
-    border-radius: 15px;
-    max-width: 80%;
-    word-wrap: break-word;
-}
+        .user-info strong {
+            color: #ffffff;
+        }
 
-.other-message {
-    background-color: #533483;  /* Changed from #f1f1f1 to purple */
-    color: #ffffff;  /* White text */
-    align-self: flex-start;
-    padding: 0.5rem 1rem;
-    border-radius: 15px;
-    max-width: 80%;
-    word-wrap: break-word;
-}
+        .logout-btn {
+            padding: 0.4rem 0.85rem;
+            background-color: #e94560;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
 
-.input-group {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
+        .logout-btn:hover {
+            background-color: #c73e54;
+        }
 
-input[type="text"], input[type="email"], input[type="password"] {
-    padding: 0.75rem;
-    font-size: 1rem;
-    border-radius: 5px;
-    border: 1px solid #555;
-    background-color: #0f3460;
-    color: #ffffff;
-}
+        #chat {
+            flex: 1;
+            width: 100%;
+            border: 1px solid #0f3460;
+            padding: 1rem;
+            overflow-y: auto;
+            background-color: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
 
-input[type="text"]::placeholder,
-input[type="email"]::placeholder,
-input[type="password"]::placeholder {
-    color: #aaa;
-}
+        /* Message Bubbles */
+        .user-message {
+            background-color: #e94560;
+            color: #ffffff;
+            align-self: flex-end;
+            padding: 0.6rem 0.9rem;
+            border-radius: 12px 12px 2px 12px;
+            max-width: 80%;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
 
-#send {
-    padding: 0.75rem;
-    font-size: 1rem;
-    background-color: #e94560;  /* Changed to match theme */
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
+        .other-message {
+            background-color: #533483;
+            color: #ffffff;
+            align-self: flex-start;
+            padding: 0.6rem 0.9rem;
+            border-radius: 12px 12px 12px 2px;
+            max-width: 80%;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
 
-#send:hover {
-    background-color: #c73e54;
-}
+        .system-message {
+            align-self: center;
+            color: #4ef0b0;
+            font-size: 0.82rem;
+            background-color: rgba(78, 240, 176, 0.1);
+            padding: 0.3rem 0.75rem;
+            border-radius: 12px;
+            margin: 0.2rem 0;
+            text-align: center;
+        }
 
-.logout-btn {
-    padding: 0.5rem 1rem;
-    background-color: #f44336;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-bottom: 1rem;
-}
+        /* Input Group - Horizontal Alignment */
+        .input-group {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            gap: 0.5rem;
+        }
 
-.logout-btn:hover {
-    background-color: #d32f2f;
-}
+        .input-group input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            border: 1px solid #0f3460;
+            background-color: #0f3460;
+            color: #ffffff;
+            outline: none;
+        }
 
-.user-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
+        .input-group input[type="text"]:focus {
+            border-color: #e94560;
+        }
 
-.user-info span {
-    color: #e0e0e0;  /* Light text for user info */
-}
-        </style>
+        #send {
+            padding: 0.75rem 1.25rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background-color: #e94560;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background-color 0.2s;
+        }
+
+        #send:hover {
+            background-color: #c73e54;
+        }
+
+        /* Responsive Mobile Styles */
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            #auth-container, #chat-container {
+                padding: 1rem;
+                border-radius: 8px;
+            }
+
+            #chat-container {
+                height: 88vh;
+            }
+
+            .user-message, .other-message {
+                max-width: 88%;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
 </head>
 <body>
   <h2>Rust WebSocket Chat</h2>
 
   <!-- Authentication Container -->
- <div id="auth-container">
-  <h3 id="auth-title">Login</h3>
-  <div id="auth-error" class="auth-error"></div>
-  
-  <input type="email" id="auth-email" class="auth-input" placeholder="Email" />
-  <input type="password" id="auth-email-password" class="auth-input" placeholder="Email Password" />
-  <input type="password" id="auth-user-password" class="auth-input" placeholder="User Password" />
-  
-  <button id="auth-submit" class="auth-btn">Login</button>
-  <button id="auth-toggle" class="auth-btn secondary">Don't have an account? Sign Up</button>
-</div>
+  <div id="auth-container">
+    <h3 id="auth-title">Login</h3>
+    <div id="auth-error" class="auth-error"></div>
+    
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email" />
+    <input type="password" id="auth-email-password" class="auth-input" placeholder="Email Password" />
+    <input type="password" id="auth-user-password" class="auth-input" placeholder="User Password" />
+    
+    <button id="auth-submit" class="auth-btn">Login</button>
+    <button id="auth-toggle" class="auth-btn secondary">Don't have an account? Sign Up</button>
+  </div>
 
   <!-- Chat Container -->
   <div id="chat-container">
@@ -239,20 +299,20 @@ input[type="password"]::placeholder {
     let currentUser = null;
     let isLoginMode = true;
     let socket = null;
+    
+    // UI Elements
     const chat = document.getElementById("chat");
     const messageInput = document.getElementById("message");
     const sendBtn = document.getElementById("send");
-
-    // Auth elements
     const authContainer = document.getElementById("auth-container");
     const chatContainer = document.getElementById("chat-container");
-   const authEmail = document.getElementById("auth-email");
-const authEmailPassword = document.getElementById("auth-email-password");
-const authUserPassword = document.getElementById("auth-user-password");
-const authSubmit = document.getElementById("auth-submit");
-const authToggle = document.getElementById("auth-toggle");
-const authTitle = document.getElementById("auth-title");
-const authError = document.getElementById("auth-error");
+    const authEmail = document.getElementById("auth-email");
+    const authEmailPassword = document.getElementById("auth-email-password");
+    const authUserPassword = document.getElementById("auth-user-password");
+    const authSubmit = document.getElementById("auth-submit");
+    const authToggle = document.getElementById("auth-toggle");
+    const authTitle = document.getElementById("auth-title");
+    const authError = document.getElementById("auth-error");
     const currentUserSpan = document.getElementById("current-user");
     const logoutBtn = document.getElementById("logout-btn");
 
@@ -267,115 +327,100 @@ const authError = document.getElementById("auth-error");
 
     // Handle authentication
     authSubmit.addEventListener("click", async () => {
-  const email = authEmail.value.trim();
-  const emailPassword = authEmailPassword.value.trim();
-  const userPassword = authUserPassword.value.trim();
+      const email = authEmail.value.trim();
+      const emailPassword = authEmailPassword.value.trim();
+      const userPassword = authUserPassword.value.trim();
 
-  // Validate both passwords are filled
-  if (!email || !emailPassword || !userPassword) {
-    authError.textContent = "Please fill in all fields (Email, Email Password, and User Password)";
-    return;
-  }
-
-  authError.textContent = "";
-
-  try {
-    const endpoint = isLoginMode ? "/login" : "/signup";
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ 
-        email: email, 
-        email_password: emailPassword,
-        user_password: userPassword 
-      }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Authentication successful
-      currentUser = email;
-      authContainer.style.display = "none";
-      chatContainer.style.display = "block";
-      currentUserSpan.innerHTML = `Logged in as: <strong>${email}</strong>`;
-      
-      // Initialize WebSocket connection
-      connectWebSocket();
-      
-      // Enable chat
-      messageInput.disabled = false;
-      sendBtn.disabled = false;
-      
-      appendSystemMessage(`✅ Welcome, ${email}!`);
-    } else {
-      authError.textContent = data.error || "Authentication failed";
-    }
-  } catch (error) {
-    authError.textContent = "Error connecting to server";
-    console.error("Auth error:", error);
-  }
-});
-
-// Logout
-logoutBtn.addEventListener("click", async () => {
-  try {
-    await fetch("/logout", { method: "POST" });
-  } catch (e) {
-    console.error("Logout error:", e);
-  }
-  
-  // Close WebSocket
-  if (socket) {
-    socket.close();
-    socket = null;
-  }
-  
-  // Reset UI
-  currentUser = null;
-  authContainer.style.display = "block";
-  chatContainer.style.display = "none";
-  chat.innerHTML = "";
-  authEmail.value = "";
-  authEmailPassword.value = "";
-  authUserPassword.value = "";
-  messageInput.disabled = true;
-  sendBtn.disabled = true;
-  
-  // Reset to login mode
-  isLoginMode = true;
-  authTitle.textContent = "Login";
-  authSubmit.textContent = "Login";
-  authToggle.textContent = "Don't have an account? Sign Up";
-  authError.textContent = "";
-});
-
-// Enter key to submit auth (from any field)
-authEmailPassword.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    authSubmit.click();
-  }
-});
-
-authUserPassword.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    authSubmit.click();
-  }
-});
-
-    // WebSocket connection
-    function connectWebSocket() {
-      if (socket && socket.readyState === WebSocket.OPEN) {
+      if (!email || !emailPassword || !userPassword) {
+        authError.textContent = "Please fill in all fields";
         return;
       }
 
+      authError.textContent = "";
+
+      try {
+        const endpoint = isLoginMode ? "/login" : "/signup";
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            email: email, 
+            email_password: emailPassword,
+            user_password: userPassword 
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          currentUser = email;
+          authContainer.style.display = "none";
+          chatContainer.style.display = "flex";
+          currentUserSpan.innerHTML = `Logged in as: <strong>${email}</strong>`;
+          
+          connectWebSocket();
+          
+          messageInput.disabled = false;
+          sendBtn.disabled = false;
+          
+          appendSystemMessage(`✅ Welcome, ${email}!`);
+        } else {
+          authError.textContent = data.error || "Authentication failed";
+        }
+      } catch (error) {
+        authError.textContent = "Error connecting to server";
+        console.error("Auth error:", error);
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await fetch("/logout", { method: "POST" });
+      } catch (e) {
+        console.error("Logout error:", e);
+      }
+      
+      if (socket) {
+        socket.close();
+        socket = null;
+      }
+      
+      currentUser = null;
+      authContainer.style.display = "block";
+      chatContainer.style.display = "none";
+      chat.innerHTML = "";
+      authEmail.value = "";
+      authEmailPassword.value = "";
+      authUserPassword.value = "";
+      messageInput.disabled = true;
+      sendBtn.disabled = true;
+      
+      isLoginMode = true;
+      authTitle.textContent = "Login";
+      authSubmit.textContent = "Login";
+      authToggle.textContent = "Don't have an account? Sign Up";
+      authError.textContent = "";
+    });
+
+    // Enter key event listeners for auth inputs
+    authEmailPassword.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") authSubmit.click();
+    });
+
+    authUserPassword.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") authSubmit.click();
+    });
+
+    // WebSocket connection
+    function connectWebSocket() {
+      if (socket && socket.readyState === WebSocket.OPEN) return;
+
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-       socket = new WebSocket(`${protocol}//${window.location.host}/chat`);
+      socket = new WebSocket(`${protocol}//${window.location.host}/chat`);
+
       socket.onopen = () => {
         appendSystemMessage("✅ Connected to chat server");
-        // Send user info to server
         if (currentUser) {
           socket.send(JSON.stringify({ type: "auth", email: currentUser }));
         }
@@ -390,7 +435,6 @@ authUserPassword.addEventListener("keypress", (e) => {
             appendSystemMessage(data.text);
           }
         } catch (e) {
-          // Fallback for plain text messages
           appendMessage(event.data, false);
         }
       };
@@ -422,28 +466,14 @@ authUserPassword.addEventListener("keypress", (e) => {
       }
     };
 
-    // Enter key to send message
     messageInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        sendBtn.click();
-      }
-    });
-
-    // Enter key to submit auth
-    authPassword.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        authSubmit.click();
-      }
+      if (e.key === "Enter") sendBtn.click();
     });
 
     // Helper functions
     function appendMessage(msg, isUserMessage) {
       const el = document.createElement("div");
-      if (isUserMessage) {
-        el.classList.add("user-message");
-      } else {
-        el.classList.add("other-message");
-      }
+      el.classList.add(isUserMessage ? "user-message" : "other-message");
       el.textContent = msg;
       chat.appendChild(el);
       chat.scrollTop = chat.scrollHeight;
@@ -451,15 +481,13 @@ authUserPassword.addEventListener("keypress", (e) => {
 
     function appendSystemMessage(msg) {
       const el = document.createElement("div");
-      el.style.textAlign = "center";
-      el.style.color = "green";
-      el.style.fontSize = "1.0rem";
+      el.classList.add("system-message");
       el.textContent = msg;
       chat.appendChild(el);
       chat.scrollTop = chat.scrollHeight;
     }
 
-    // Initially disable chat
+    // Initial state
     messageInput.disabled = true;
     sendBtn.disabled = true;
   </script>
