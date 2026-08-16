@@ -1,0 +1,73 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout your source code
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      # Install Rust (for building)
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      
+      # Build the binary (server will NEVER do this)
+      - name: Build release binary
+        run: cargo build --release --locked
+      
+      # Setup SSH key for deployment
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+      
+      # Stop the service (so binary can be overwritten)
+      - name: Stop service
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "sudo systemctl stop live_chat || true"
+      
+      # Copy the binary (built by GitHub, not server!)
+      - name: Deploy binary
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          scp -i ~/.ssh/id_ed25519 ./target/release/live_chat root@$DROPLET_IP:/opt/live_chat/
+      
+      # Copy static files
+      - name: Deploy static files
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          scp -i ~/.ssh/id_ed25519 -r ./static root@$DROPLET_IP:/opt/live_chat/
+      
+      # Start the service
+      - name: Start service
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "sudo systemctl start live_chat"
+      
+      # Verify it's running
+      - name: Verify deployment
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "sudo systemctl status live_chat --no-pager"
+          curl -f http://$DROPLET_IP:3030 || echo " App might need a moment to start"

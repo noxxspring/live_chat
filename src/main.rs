@@ -2,7 +2,7 @@ use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
 use std::env;
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use warp::http::StatusCode;
 use warp::reply::json;
 
-type Clients = Arc<Mutex<HashMap<String, broadcast::Sender<String>>>>;
+type Clients = Arc<Mutex<HashMap<String, mpsc::UnboundedSender<String>>>>;
 type UserDb = Arc<Mutex<HashMap<String, (String, String)>>>;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -238,89 +238,92 @@ async fn handle_logout() -> Result<impl warp::Reply, warp::Rejection> {
 
 // Handle WebSocket connections
 async fn handle_socket(ws: WebSocket, clients: Clients) {
-    let (mut tx, mut rx) = ws.split();
+    let (mut ws_tx, mut ws_rx) = ws.split();
 
-    // Create a broadcast channel for the session
-    let (broadcast_tx, mut broadcast_rx) = broadcast::channel::<String>(100);
+    // Create an unbounded mpsc channel to send messages to this specific client
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
 
-    // For demo, use a static key; in production use session/user ID
     let client_key = uuid::Uuid::new_v4().to_string();
 
     {
-        let mut clients = clients.lock().unwrap();
-        clients.insert(client_key.clone(), broadcast_tx.clone());
+        let mut clients_lock = clients.lock().unwrap();
+        clients_lock.insert(client_key.clone(), tx);
     }
 
     println!("🔗 New WebSocket connection established: {}", client_key);
     println!("   Total connected clients: {}", clients.lock().unwrap().len());
 
-    // Task to receive messages from the client and broadcast them
-    let clients_clone = clients.clone();
-    let client_key_clone = client_key.clone();
-    tokio::spawn(async move {
-        while let Some(result) = rx.next().await {
-            if let Ok(msg) = result {
-                if msg.is_text() {
-                    let text = msg.to_str().unwrap_or_default().to_string();
-                    
-                    // Try to parse as JSON for user messages
-                    if let Ok(json_msg) = serde_json::from_str::<serde_json::Value>(&text) {
-                        if let Some(msg_type) = json_msg.get("type").and_then(|t| t.as_str()) {
-                            if msg_type == "auth" {
-                                if let Some(email) = json_msg.get("email").and_then(|e| e.as_str()) {
-                                    println!("🔐 User authenticated via WebSocket: {}", email);
-                                    println!("   Client ID: {}", client_key_clone);
-                                    println!("   ─────────────────────────────");
-                                }
-                            } else if msg_type == "message" {
-                                if let (Some(sender), Some(text)) = (
-                                    json_msg.get("sender").and_then(|s| s.as_str()),
-                                    json_msg.get("text").and_then(|t| t.as_str())
-                                ) {
-                                    println!("💬 Message from {}: {}", sender, text);
-                                    println!("   Client ID: {}", client_key_clone);
-                                    println!("   ─────────────────────────────");
-                                }
-                            }
-                        }
-                    } else {
-                        // Plain text message (fallback)
-                        println!(" Received message: {}", text);
-                        println!("   Client ID: {}", client_key_clone);
-                        println!("   ─────────────────────────────");
-                    }
-
-                    // Broadcast message to all other clients except the sender
-                    let mut clients = clients_clone.lock().unwrap();
-                    for (key, sender) in clients.iter() {
-                        if key != &client_key_clone {
-                            let _ = sender.send(text.clone());
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // Task to send broadcasted messages back to the WebSocket client
-    tokio::spawn(async move {
-        while let Ok(msg) = broadcast_rx.recv().await {
-            if tx.send(Message::text(msg)).await.is_err() {
+    // Task to forward messages from our internal channel to the WebSocket client
+    let send_task = tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if ws_tx.send(Message::text(msg)).await.is_err() {
                 break;
             }
         }
     });
 
-    // Clean up when connection closes
-    let client_key_cleanup = client_key.clone();
-    let clients_cleanup = clients.clone();
-    tokio::spawn(async move {
-        // Wait for the connection to close
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        let mut clients = clients_cleanup.lock().unwrap();
-        clients.remove(&client_key_cleanup);
-        println!(" Client disconnected: {}", client_key_cleanup);
-        println!("   Total connected clients: {}", clients.len());
+    let clients_clone = clients.clone();
+    let client_key_clone = client_key.clone();
+
+    // Main loop: receive incoming WebSocket messages from this client
+    while let Some(result) = ws_rx.next().await {
+        if let Ok(msg) = result {
+            if msg.is_text() {
+                let raw_text = msg.to_str().unwrap_or_default().to_string();
+                
+                // Try to parse as JSON for user messages
+                if let Ok(json_msg) = serde_json::from_str::<serde_json::Value>(&raw_text) {
+                    if let Some(msg_type) = json_msg.get("type").and_then(|t| t.as_str()) {
+                        if msg_type == "auth" {
+                            if let Some(email) = json_msg.get("email").and_then(|e| e.as_str()) {
+                                println!("🔐 User authenticated via WebSocket: {}", email);
+                                println!("   Client ID: {}", client_key_clone);
+                                println!("   ─────────────────────────────");
+                            }
+                        } else if msg_type == "message" {
+                            if let (Some(sender), Some(text_content)) = (
+                                json_msg.get("sender").and_then(|s| s.as_str()),
+                                json_msg.get("text").and_then(|t| t.as_str())
+                            ) {
+                                println!("💬 Message from {}: {}", sender, text_content);
+                                println!("   Client ID: {}", client_key_clone);
+                                println!("   ─────────────────────────────");
+                                
+                                // Broadcast full raw JSON payload to ALL OTHER clients
+                                let clients_lock = clients_clone.lock().unwrap();
+                                for (key, sender_tx) in clients_lock.iter() {
+                                    if key != &client_key_clone {
+                                        let _ = sender_tx.send(raw_text.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Plain text message (fallback)
+                    println!(" Received message: {}", raw_text);
+                    println!("   Client ID: {}", client_key_clone);
+                    println!("   ─────────────────────────────");
+                    
+                    // Broadcast plain text to ALL OTHER clients
+                    let clients_lock = clients_clone.lock().unwrap();
+                    for (key, sender_tx) in clients_lock.iter() {
+                        if key != &client_key_clone {
+                            let _ = sender_tx.send(raw_text.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Cleanup happens ONLY when ws_rx finishes (connection closed)
+    send_task.abort();
+    {
+        let mut clients_lock = clients.lock().unwrap();
+        clients_lock.remove(&client_key);
+        println!(" Client disconnected: {}", client_key);
+        println!("   Total connected clients: {}", clients_lock.len());
         println!("   ─────────────────────────────");
-    });
+    }
 }
