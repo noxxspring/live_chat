@@ -9,177 +9,199 @@
             box-sizing: border-box;
           }
       
-          body {
-            font-family: sans-serif;
-            margin: 0;
-            padding: 1rem;
-            background-color: #c5b1c2;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-          }
-      
-          h2 {
-            margin-top: 0;
-            text-align: center;
-          }
+        body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background-color: #1a1a2e;  /* Changed from #c5b1c2 to dark navy */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    width: 100vw;
+}
 
-          /* Auth Container */
-          #auth-container {
-            width: 100%;
-            max-width: 400px;
-            background-color: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-top: 2rem;
-          }
+h2 {
+    margin-top: 0;
+    text-align: center;
+    color: #ffffff;  /* Added white text */
+}
 
-          #auth-container h3 {
-            margin-top: 0;
-            text-align: center;
-          }
+/* Auth Container */
+#auth-container {
+    width: 100%;
+    max-width: 400px;
+    background-color: #16213e;  /* Changed from white to dark blue */
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    margin-top: 2rem;
+}
 
-          .auth-input {
-            width: 100%;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-            border-radius: 5px;
-            border: 1px solid #999;
-          }
+#auth-container h3 {
+    margin-top: 0;
+    text-align: center;
+    color: #e0e0e0;  /* Added light text */
+}
 
-          .auth-btn {
-            width: 100%;
-            padding: 0.75rem;
-            font-size: 1rem;
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 0.5rem;
-          }
+.auth-input {
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    border-radius: 5px;
+    border: 1px solid #555;  /* Darker border */
+    background-color: #0f3460;  /* Added dark input background */
+    color: #ffffff;  /* White text in inputs */
+}
 
-          .auth-btn:hover {
-            background-color: #45a049;
-          }
+.auth-input::placeholder {
+    color: #aaa;  /* Lighter placeholder text */
+}
 
-          .auth-btn.secondary {
-            background-color: #2196F3;
-          }
+.auth-btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    background-color: #e94560;  /* Changed from #4caf50 to vibrant red/pink */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
 
-          .auth-btn.secondary:hover {
-            background-color: #1976D2;
-          }
+.auth-btn:hover {
+    background-color: #c73e54;  /* Darker hover */
+}
 
-          .auth-error {
-            color: red;
-            text-align: center;
-            margin-bottom: 1rem;
-            font-size: 0.9rem;
-          }
+.auth-btn.secondary {
+    background-color: #533483;  /* Changed from #2196F3 to purple */
+}
 
-          .auth-toggle {
-            text-align: center;
-            margin-top: 1rem;
-            cursor: pointer;
-            color: #2196F3;
-          }
+.auth-btn.secondary:hover {
+    background-color: #3d2566;  /* Darker purple */
+}
 
-          .auth-toggle:hover {
-            text-decoration: underline;
-          }
+.auth-error {
+    color: #ff6b6b;  /* Brighter red */
+    text-align: center;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
 
-          /* Hide chat until authenticated */
-          #chat-container {
-            display: none;
-            width: 100%;
-            max-width: 600px;
-          }
-      
-          #chat {
-            width: 100%;
-            height: 50vh;
-            border: 1px solid #ccc;
-            padding: 1rem;
-            overflow-y: auto;
-            background-color: #d3d3d3;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            border-radius: 10px;
-          }
-      
-          .user-message {
-            background-color: #d1f7c4;
-            align-self: flex-end;
-            padding: 0.5rem;
-            border-radius: 10px;
-            max-width: 80%;
-            word-wrap: break-word;
-          }
-      
-          .other-message {
-            background-color: #f1f1f1;
-            align-self: flex-start;
-            padding: 0.5rem;
-            border-radius: 10px;
-            max-width: 80%;
-            word-wrap: break-word;
-          }
-      
-          .input-group {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            gap: 0.5rem;
-            margin-top: 1rem;
-          }
-      
-          input[type="text"], input[type="email"], input[type="password"] {
-            padding: 0.75rem;
-            font-size: 1rem;
-            border-radius: 5px;
-            border: 1px solid #999;
-          }
-      
-          #send {
-            padding: 0.75rem;
-            font-size: 1rem;
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-          }
-      
-          #send:hover {
-            background-color: #45a049;
-          }
+.auth-toggle {
+    text-align: center;
+    margin-top: 1rem;
+    cursor: pointer;
+    color: #e94560;  /* Changed to match primary color */
+}
 
-          .logout-btn {
-            padding: 0.5rem 1rem;
-            background-color: #f44336;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 1rem;
-          }
+.auth-toggle:hover {
+    text-decoration: underline;
+}
 
-          .logout-btn:hover {
-            background-color: #d32f2f;
-          }
+/* Hide chat until authenticated */
+#chat-container {
+    display: none;
+    width: 100%;
+    max-width: 600px;
+}
 
-          .user-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-          }
+#chat {
+    width: 100%;
+    height: 50vh;
+    border: 1px solid #444;
+    padding: 1rem;
+    overflow-y: auto;
+    background-color: #1a1a2e;  /* Changed to match body */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 10px;
+}
+
+.user-message {
+    background-color: #e94560;  /* Changed from #d1f7c4 to vibrant red/pink */
+    color: #ffffff;  /* White text */
+    align-self: flex-end;
+    padding: 0.5rem 1rem;
+    border-radius: 15px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.other-message {
+    background-color: #533483;  /* Changed from #f1f1f1 to purple */
+    color: #ffffff;  /* White text */
+    align-self: flex-start;
+    padding: 0.5rem 1rem;
+    border-radius: 15px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+input[type="text"], input[type="email"], input[type="password"] {
+    padding: 0.75rem;
+    font-size: 1rem;
+    border-radius: 5px;
+    border: 1px solid #555;
+    background-color: #0f3460;
+    color: #ffffff;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder {
+    color: #aaa;
+}
+
+#send {
+    padding: 0.75rem;
+    font-size: 1rem;
+    background-color: #e94560;  /* Changed to match theme */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#send:hover {
+    background-color: #c73e54;
+}
+
+.logout-btn {
+    padding: 0.5rem 1rem;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 1rem;
+}
+
+.logout-btn:hover {
+    background-color: #d32f2f;
+}
+
+.user-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.user-info span {
+    color: #e0e0e0;  /* Light text for user info */
+}
         </style>
 </head>
 <body>
@@ -349,8 +371,8 @@ authUserPassword.addEventListener("keypress", (e) => {
         return;
       }
 
-      socket = new WebSocket(`wss://${window.location.host}/chat`);
-
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+       socket = new WebSocket(`${protocol}//${window.location.host}/chat`);
       socket.onopen = () => {
         appendSystemMessage("✅ Connected to chat server");
         // Send user info to server
