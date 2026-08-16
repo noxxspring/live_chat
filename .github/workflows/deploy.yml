@@ -1,4 +1,4 @@
-name: Build and Deploy Docker Image
+name: Build and Deploy with Docker Compose
 
 on:
   push:
@@ -16,13 +16,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      - name: Build Docker image
+      - name: Build Docker images
         run: |
-          docker build -t live_chat:${{ github.sha }} .
-          docker tag live_chat:${{ github.sha }} live_chat:latest
+          docker compose build
       
-      - name: Save image
-        run: docker save live_chat:latest -o live_chat.tar
+      - name: Save images
+        run: |
+          docker save live_chat:latest -o live_chat.tar
+          docker save nginx:latest -o nginx.tar
       
       - name: Setup SSH key
         env:
@@ -34,20 +35,43 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
       
-      - name: Deploy to Droplet
+      - name: Copy files to Droplet
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "docker stop chat-app || true && docker rm chat-app || true"
+          # Copy Docker images
           scp -i ~/.ssh/id_ed25519 live_chat.tar root@$DROPLET_IP:/root/
+          scp -i ~/.ssh/id_ed25519 nginx.tar root@$DROPLET_IP:/root/
+          
+          # Copy docker-compose.yml and nginx.conf
+          scp -i ~/.ssh/id_ed25519 docker-compose.yml root@$DROPLET_IP:/opt/live_chat/
+          scp -i ~/.ssh/id_ed25519 nginx.conf root@$DROPLET_IP:/opt/live_chat/
+          
+          # Copy static files (if any changes)
+          scp -i ~/.ssh/id_ed25519 -r ./static root@$DROPLET_IP:/opt/live_chat/
+      
+      - name: Deploy on Droplet
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
           ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
+            cd /opt/live_chat
+            
+            # Load Docker images
             docker load -i /root/live_chat.tar
-            docker run -d \
-              -p 3030:3030 \
-              --name chat-app \
-              --restart unless-stopped \
-              live_chat:latest
-            rm -f /root/live_chat.tar
+            docker load -i /root/nginx.tar
+            rm -f /root/live_chat.tar /root/nginx.tar
+            
+            # Stop and remove old containers
+            docker compose down || true
+            
+            # Start new containers
+            docker compose up -d
+            
+            # Clean up unused images
+            docker image prune -f
+            
+            echo " Deployment complete!"
           EOF
       
       - name: Verify deployment
@@ -55,4 +79,5 @@ jobs:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
         run: |
           sleep 5
-          curl -f http://$DROPLET_IP:3030 || exit 1
+          curl -f http://$DROPLET_IP || exit 1
+          echo " App is running at http://$DROPLET_IP"

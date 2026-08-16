@@ -445,7 +445,7 @@
       };
 
       socket.onclose = () => {
-        appendSystemMessage("⚠️ Disconnected from server");
+        appendSystemMessage(" Disconnected from server");
       };
     }
 
@@ -462,7 +462,7 @@
         appendMessage(`You: ${msg}`, true);
         messageInput.value = "";
       } else if (!socket || socket.readyState !== WebSocket.OPEN) {
-        appendSystemMessage("❌ Not connected to server");
+        appendSystemMessage(" Not connected to server");
       }
     };
 

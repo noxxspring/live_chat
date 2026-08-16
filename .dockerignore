@@ -4,3 +4,6 @@ target/
 *.rs.bk
 .env
 *.md
+.DS_Store
+docker-compose.yml
+nginx.conf
