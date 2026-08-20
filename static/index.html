@@ -441,7 +441,7 @@
 
       socket.onerror = (error) => {
         console.error("WebSocket error:", error);
-        appendSystemMessage("❌ WebSocket error occurred");
+        appendSystemMessage(" WebSocket error occurred");
       };
 
       socket.onclose = () => {
