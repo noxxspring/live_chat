@@ -18,6 +18,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ORACLE_IP: ${{ secrets.ORACLE_IP }}
         run: |
+          # Strip Windows carriage returns (\r) and spaces from IP
           CLEAN_IP=$(echo -n "$ORACLE_IP" | tr -d '\r\n ')
           echo "SERVER_IP=$CLEAN_IP" >> $GITHUB_ENV
 
@@ -28,10 +29,10 @@ jobs:
 
       - name: Sync project files to Oracle Server
         run: |
-          # Ensure deployment directory exists and has permissions
+          # Ensure target directory exists and has correct permissions
           ssh -i ~/.ssh/id_ed25519 ubuntu@$SERVER_IP "sudo mkdir -p /opt/live_chat && sudo chown -R ubuntu:ubuntu /opt/live_chat"
 
-          # Sync project files using rsync (fast and transfers only changes)
+          # Sync repository files (excluding git metadata)
           rsync -avz --delete \
             --exclude '.git' \
             --exclude '.github' \
@@ -58,7 +59,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          sleep 10
-          echo "Checking if app is running..."
-          curl -f http://$SERVER_IP || exit 1
-          echo "App is running at http://$SERVER_IP"
+          sleep 5
+          echo "Checking if app is healthy..."
+          curl -f --connect-timeout 5 --max-time 15 http://$SERVER_IP || exit 1
+          echo "Verification passed! App is responsive at http://$SERVER_IP"
