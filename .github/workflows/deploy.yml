@@ -1,4 +1,4 @@
-name: Build and Deploy with Docker Compose
+name: Build and Deploy to Oracle Cloud
 
 on:
   push:
@@ -8,18 +8,14 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
-      - name: Build Docker images with Compose
-        run: |
-          docker compose build
-          
+
       - name: Build Docker images with Compose
         run: |
           docker pull nginx:latest
@@ -29,68 +25,62 @@ jobs:
         run: |
           docker save live_chat:latest -o live_chat.tar
           docker save nginx:latest -o nginx.tar
-      
+
       - name: Setup SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          ORACLE_IP: ${{ secrets.ORACLE_IP }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
-      
-      - name: Copy files to Droplet
+          ssh-keyscan -H "$ORACLE_IP" >> ~/.ssh/known_hosts
+
+      - name: Copy files to Oracle Server
         env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          ORACLE_IP: ${{ secrets.ORACLE_IP }}
         run: |
-          # Create directory if it doesn't exist
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP "mkdir -p /opt/live_chat"
-          
+          # Ensure deployment directory exists and has correct permissions
+          ssh -i ~/.ssh/id_ed25519 ubuntu@$ORACLE_IP "sudo mkdir -p /opt/live_chat && sudo chown -R ubuntu:ubuntu /opt/live_chat"
+
           # Copy Docker images
-          scp -i ~/.ssh/id_ed25519 live_chat.tar root@$DROPLET_IP:/root/
-          scp -i ~/.ssh/id_ed25519 nginx.tar root@$DROPLET_IP:/root/
-          
-          # Copy docker-compose.yml and nginx.conf
-          scp -i ~/.ssh/id_ed25519 docker-compose.yml root@$DROPLET_IP:/opt/live_chat/
-          scp -i ~/.ssh/id_ed25519 nginx.conf root@$DROPLET_IP:/opt/live_chat/
-          
-          # Copy static files (if any changes)
-          scp -i ~/.ssh/id_ed25519 -r ./static root@$DROPLET_IP:/opt/live_chat/ 2>/dev/null || true
-      
-      - name: Deploy on Droplet
+          scp -i ~/.ssh/id_ed25519 live_chat.tar ubuntu@$ORACLE_IP:/home/ubuntu/
+          scp -i ~/.ssh/id_ed25519 nginx.tar ubuntu@$ORACLE_IP:/home/ubuntu/
+
+          # Copy configuration and static files
+          scp -i ~/.ssh/id_ed25519 docker-compose.yml ubuntu@$ORACLE_IP:/opt/live_chat/
+          scp -i ~/.ssh/id_ed25519 nginx.conf ubuntu@$ORACLE_IP:/opt/live_chat/
+          scp -i ~/.ssh/id_ed25519 -r ./static ubuntu@$ORACLE_IP:/opt/live_chat/ 2>/dev/null || true
+
+      - name: Deploy on Oracle Server
         env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          ORACLE_IP: ${{ secrets.ORACLE_IP }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@$DROPLET_IP << 'EOF'
+          ssh -i ~/.ssh/id_ed25519 ubuntu@$ORACLE_IP "bash -s" << EOF
             cd /opt/live_chat
-            
-            # Load Docker images
-            echo " Loading Docker images..."
-            docker load -i /root/live_chat.tar
-            docker load -i /root/nginx.tar
-            rm -f /root/live_chat.tar /root/nginx.tar
-            
-            # Stop and remove old containers
+
+            echo "Loading Docker images..."
+            docker load -i /home/ubuntu/live_chat.tar
+            docker load -i /home/ubuntu/nginx.tar
+            rm -f /home/ubuntu/live_chat.tar /home/ubuntu/nginx.tar
+
             echo "Stopping old containers..."
             docker compose down || true
-            
-            # Start new containers
-            echo " Starting new containers..."
+
+            echo "Starting new containers..."
             docker compose up -d
-            
-            # Clean up unused images
+
+            echo "Cleaning up unused images..."
             docker image prune -f
-            
-            echo "Deployment complete!"
-            echo "App running at http://$DROPLET_IP"
+
+            echo "Deployment complete! App running at http://$ORACLE_IP"
           EOF
-      
+
       - name: Verify deployment
         env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          ORACLE_IP: ${{ secrets.ORACLE_IP }}
         run: |
           sleep 10
-          echo " Checking if app is running..."
-          curl -f http://$DROPLET_IP || exit 1
-          echo "App is running at http://$DROPLET_IP"
+          echo "Checking if app is running..."
+          curl -f http://$ORACLE_IP || exit 1
+          echo "App is running at http://$ORACLE_IP"
