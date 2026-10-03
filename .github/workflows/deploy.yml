@@ -1,4 +1,4 @@
-name: Build and Deploy to Oracle Cloud (ARM64)
+name: Deploy Directly to Oracle Cloud
 
 on:
   push:
@@ -13,30 +13,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Required to build ARM64 images on GitHub's x86_64 runners
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker images for ARM64
-        run: |
-          docker buildx build --platform linux/arm64 -t live_chat:latest --load .
-          docker pull --platform linux/arm64 nginx:latest
-
-      - name: Save images
-        run: |
-          docker save live_chat:latest -o live_chat.tar
-          docker save nginx:latest -o nginx.tar
-
       - name: Setup SSH key & Clean IP
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ORACLE_IP: ${{ secrets.ORACLE_IP }}
         run: |
-          # Strip carriage returns (\r) and spaces from IP
-          CLEAN_IP=$(echo -n "$ORACLE_IP" | tr -d '\r\n ' )
+          CLEAN_IP=$(echo -n "$ORACLE_IP" | tr -d '\r\n ')
           echo "SERVER_IP=$CLEAN_IP" >> $GITHUB_ENV
 
           mkdir -p ~/.ssh
@@ -44,37 +26,31 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$CLEAN_IP" >> ~/.ssh/known_hosts
 
-      - name: Copy files to Oracle Server
+      - name: Sync project files to Oracle Server
         run: |
-          # Ensure deployment directory exists and has correct permissions
+          # Ensure deployment directory exists and has permissions
           ssh -i ~/.ssh/id_ed25519 ubuntu@$SERVER_IP "sudo mkdir -p /opt/live_chat && sudo chown -R ubuntu:ubuntu /opt/live_chat"
 
-          # Copy Docker images directly into /opt/live_chat
-          scp -i ~/.ssh/id_ed25519 live_chat.tar ubuntu@$SERVER_IP:/opt/live_chat/
-          scp -i ~/.ssh/id_ed25519 nginx.tar ubuntu@$SERVER_IP:/opt/live_chat/
+          # Sync project files using rsync (fast and transfers only changes)
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            ./ ubuntu@$SERVER_IP:/opt/live_chat/
 
-          # Copy configuration files
-          scp -i ~/.ssh/id_ed25519 docker-compose.yml ubuntu@$SERVER_IP:/opt/live_chat/
-          scp -i ~/.ssh/id_ed25519 nginx.conf ubuntu@$SERVER_IP:/opt/live_chat/
-          scp -i ~/.ssh/id_ed25519 -r ./static ubuntu@$SERVER_IP:/opt/live_chat/ 2>/dev/null || true
-
-      - name: Deploy on Oracle Server
+      - name: Build and Restart on Oracle Server
         run: |
           ssh -i ~/.ssh/id_ed25519 ubuntu@$SERVER_IP "bash -s" << EOF
             cd /opt/live_chat
 
-            echo "Loading ARM64 Docker images..."
-            docker load -i live_chat.tar
-            docker load -i nginx.tar
-            rm -f live_chat.tar nginx.tar
+            echo "Building containers natively on ARM64..."
+            docker compose build
 
-            echo "Stopping old containers..."
+            echo "Restarting containers..."
             docker compose down || true
-
-            echo "Starting new containers..."
             docker compose up -d
 
-            echo "Cleaning up unused images..."
+            echo "Cleaning up dangling images..."
             docker image prune -f
 
             echo "Deployment complete! App running at http://$SERVER_IP"
