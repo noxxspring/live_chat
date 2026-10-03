@@ -9,6 +9,11 @@ services:
       - "3030"
     networks:
       - app_network  
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"  
 
   # The Nginx reverse proxy
   nginx:
@@ -25,6 +30,11 @@ services:
       - live_chat
     networks:
       - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"  
 
 # TOP-LEVEL networks block
 networks:
