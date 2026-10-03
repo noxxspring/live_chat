@@ -61,5 +61,5 @@ jobs:
         run: |
           sleep 5
           echo "Checking if app is healthy..."
-          curl -f --connect-timeout 5 --max-time 15 http://$SERVER_IP || exit 1
-          echo "Verification passed! App is responsive at http://$SERVER_IP"
+          curl -f --connect-timeout 5 --max-time 15 https://chat-application.duckdns.org || exit 1
+          echo "Verification passed! App is responsive on HTTPS"
